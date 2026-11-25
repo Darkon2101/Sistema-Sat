@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAT Gamificado - Dark Fantasy DB</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0c;
+            --panel-bg: rgba(20, 20, 25, 0.85);
+            --text-main: #e2e2e2;
+            --accent: #ff2a2a;
+            --card-bg: #1f1f2e;
+            --card-hover: #2a2a3d;
+            --boss-color: #ffaa00;
+        }
+        body {
+            margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+        
+        #pantalla-seleccion { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        #pantalla-seleccion h1 { color: #fff; text-shadow: 0 0 15px var(--accent); font-size: 3rem; margin-bottom: 2rem;}
+        .clases-container { display: flex; gap: 2rem; }
+        .clase-btn { background: var(--panel-bg); border: 2px solid #333; padding: 2rem; border-radius: 15px; cursor: pointer; transition: 0.3s; width: 220px; text-align: center; }
+        .clase-btn:hover { border-color: var(--accent); transform: translateY(-10px); box-shadow: 0 10px 25px rgba(255, 42, 42, 0.3); }
+        .icono-clase { font-size: 4rem; margin-bottom: 1rem; text-shadow: 0 0 20px var(--accent); }
+        .clase-btn h2 { color: var(--accent); margin: 0; font-size: 1.8rem;}
+        
+        #pantalla-juego { display: none; height: 100vh; flex-direction: column; }
+        header { display: flex; justify-content: space-between; padding: 1rem 2rem; background: #111; border-bottom: 2px solid #333; font-size: 1.2rem; align-items: center; }
+        
+        /* Estilos de los Corazones Normales con Animación de Daño */
+        .vidas-container { display: flex; gap: 8px; align-items: center; font-weight: bold; font-size: 1.2rem; }
+        .corazon {
+            font-size: 1.5rem;
+            display: inline-block;
+            transition: transform 0.2s;
+            filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.6));
+        }
+
+        @keyframes dañoCorazon {
+            0% { transform: scale(1); filter: drop-shadow(0 0 4px red); }
+            50% { transform: scale(1.4) rotate(-10deg); filter: brightness(2) drop-shadow(0 0 10px white); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 4px red); }
+        }
+        .animar-daño {
+            animation: dañoCorazon 0.4s ease-in-out;
+        }
+        
+        #timer-container { width: 100%; height: 8px; background: #222; }
+        #timer-bar { width: 100%; height: 100%; background: #4aff4a; transition: width 1s linear, background-color 0.5s; }
+
+        main { display: flex; flex: 1; overflow: hidden; }
+        .combate-area { flex: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        
+        .enemigo-container { text-align: center; margin-bottom: 2rem; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); filter: drop-shadow(0 0 10px var(--accent)); } 100% { transform: scale(1); } }
+        
+        .enemigo-img { width: 180px; height: 180px; border-radius: 10px; border: 2px solid #444; object-fit: cover; }
+        .dialogo-enemigo { background: rgba(0,0,0,0.8); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--accent); margin-top: 1rem; max-width: 500px; font-size: 1.2rem; min-height: 80px; display:flex; align-items:center; justify-content:center;}
+        
+        .cartas-container { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
+        .carta {
+            background: var(--card-bg); border: 2px solid #555; border-radius: 10px;
+            width: 200px; height: 260px; padding: 1rem; cursor: pointer;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; transition: 0.2s; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .carta:hover { transform: translateY(-15px) scale(1.05); border-color: var(--accent); background: var(--card-hover); }
+        
+        .log-area { flex: 1; background: var(--panel-bg); border-left: 2px solid #333; padding: 1.5rem; overflow-y: auto; }
+        .log-entry { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #333; font-size: 0.95rem; }
+        .log-correct { color: #4aff4a; }
+        .log-error { color: var(--accent); }
+
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 2rem;}
+        .overlay h1 { font-size: 3.5rem; color: var(--boss-color); margin-bottom: 1rem; text-shadow: 0 0 20px var(--boss-color); }
+        .overlay p { font-size: 1.4rem; color: #ccc; max-width: 600px; margin-bottom: 2rem; line-height: 1.6; }
+        .overlay button { padding: 1rem 2.5rem; font-size: 1.2rem; cursor: pointer; background: var(--boss-color); color: #000; border: none; font-weight: bold; border-radius: 5px; transition: 0.2s;}
+        .overlay button:hover { transform: scale(1.05); background: #fff; }
+    </style>
+</head>
+<body>
+    <div id="pantalla-seleccion">
+        <h1>ELIGE TU CLASE</h1>
+        <div class="clases-container">
+            <div class="clase-btn" onclick="iniciarJuego('videojuegos')">
+                <div class="icono-clase">🎮</div>
+                <h2>Player 1</h2>
+                <p>El Tecnomante</p>
+            </div>
+            <div class="clase-btn" onclick="iniciarJuego('cineAnime')">
+                <div class="icono-clase">🎬</div>
+                <h2>Player 2</h2>
+                <p>El Explorador</p>
+            </div>
+            <div class="clase-btn" onclick="iniciarJuego('musica')">
+                <div class="icono-clase">🎸</div>
+                <h2>Player 3</h2>
+                <p>El Ídolo Pop</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="pantalla-juego">
+        <header>
+            <div id="nivel-display">Nivel: 1 / 9</div>
+            <div class="vidas-container" id="vidas-display">Vidas: </div>
+        </header>
+        <div id="timer-container"><div id="timer-bar"></div></div>
+        
+        <main>
+            <div class="combate-area">
+                <div class="enemigo-container">
+                    <img id="enemigo-img" class="enemigo-img" src="" alt="Enemigo">
+                    <h2 id="enemigo-nombre" style="color: var(--accent);">Cargando...</h2>
+                    <div id="enemigo-dialogo" class="dialogo-enemigo">Conectando a la base de datos...</div>
+                </div>
+                <div class="cartas-container" id="cartas-container"></div>
+            </div>
+            
+            <div class="log-area" id="log-area">
+                <h3 style="color: #fff; border-bottom: 1px solid #555; padding-bottom: 10px;">Registro de Combate</h3>
+            </div>
+        </main>
+    </div>
+
+    <div id="pantalla-aviso-jefe" class="overlay">
+        <h1 id="aviso-titulo">¡ALERTA DE JEFE FINAL!</h1>
+        <p id="aviso-texto">Has llegado al final del trayecto. Prepárate para enfrentarte al jefe supremo.</p>
+        <button onclick="cerrarAvisoJefe()">¡ACEPTAR EL RETO!</button>
+    </div>
+
+    <div id="pantalla-derrota" class="overlay">
+        <h1 style="color: var(--accent); text-shadow: 0 0 20px var(--accent);">ESTÁS FUERA</h1>
+        <p style="color: #aaa; font-size: 1.5rem;">Has perdido tus 3 vidas.</p>
+        <button onclick="location.reload()" style="background: var(--accent); color: #fff;">Reiniciar Sistema</button>
+    </div>
+    <div id="pantalla-victoria" class="overlay">
+        <h1 style="color: #4aff4a; text-shadow: 0 0 20px #4aff4a;">¡SISTEMA COMPLETADO!</h1>
+        <p style="color: #aaa; font-size: 1.5rem;">Has derrotado al jefe final y dominado el mundo.</p>
+        <button onclick="location.reload()" style="background: #4aff4a; color: #000;">Volver al Menú</button>
+    </div>
+
+    <script>
+        let rutaActual = [];
+        let nivelActual = 0;
+        let vidas = 3;
+        let tiempoRestante = 20;
+        let timerInterval;
+        let temaSeleccionado = '';
+
+        async function iniciarJuego(tema) {
+            temaSeleccionado = tema;
+            document.getElementById('pantalla-seleccion').style.display = 'none';
+            document.getElementById('pantalla-juego').style.display = 'flex';
+            
+            try {
+                const respuesta = await fetch(`api.php?tema=${tema}`);
+                const datosBD = await respuesta.json();
+
+                rutaActual = datosBD.map(fila => {
+                    return {
+                        nombre: fila.nombre_enemigo,
+                        img: fila.imagen_url,
+                        pregunta: fila.pregunta,
+                        opciones: [
+                            { txt: fila.opcion_correcta, correcta: true },
+                            { txt: fila.opcion_falsa1, correcta: false },
+                            { txt: fila.opcion_falsa2, correcta: false }
+                        ],
+                        feedbackError: fila.feedback_error
+                    };
+                });
+
+                if(rutaActual.length === 0) {
+                    alert("No se encontraron preguntas.");
+                    return;
+                }
+                cargarNivel();
+            } catch (error) {
+                document.getElementById('enemigo-dialogo').innerText = "Error de base de datos.";
+            }
+        }
+
+        function actualizarUI() {
+            if (nivelActual < 9) {
+                document.getElementById('nivel-display').innerText = `Nivel: ${nivelActual + 1} / 9`;
+                document.getElementById('enemigo-nombre').style.color = "var(--accent)";
+                document.getElementById('enemigo-dialogo').style.borderColor = "var(--accent)";
+            } else {
+                document.getElementById('nivel-display').innerText = `🔥 JEFE FINAL - FASE ${nivelActual - 8} / 3 🔥`;
+                document.getElementById('enemigo-nombre').style.color = "var(--boss-color)";
+                document.getElementById('enemigo-dialogo').style.borderColor = "var(--boss-color)";
+            }
+
+            const contVidas = document.getElementById('vidas-display');
+            contVidas.innerHTML = "Vidas: ";
+            for(let i=0; i<vidas; i++) { 
+                contVidas.innerHTML += `<span class="corazon">❤️</span>`; 
+            }
+        }
+
+        function registrarLog(mensaje, tipo) {
+            const log = document.getElementById('log-area');
+            log.innerHTML += `<div class="log-entry ${tipo === 'ok' ? 'log-correct' : 'log-error'}">${mensaje}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function iniciarTemporizador() {
+            clearInterval(timerInterval);
+            tiempoRestante = 20;
+            const timerBar = document.getElementById('timer-bar');
+            timerBar.style.width = '100%';
+            timerBar.style.backgroundColor = '#4aff4a';
+
+            timerInterval = setInterval(() => {
+                tiempoRestante--;
+                timerBar.style.width = `${(tiempoRestante / 20) * 100}%`;
+                if (tiempoRestante <= 10) timerBar.style.backgroundColor = '#ffcc00';
+                if (tiempoRestante <= 5) timerBar.style.backgroundColor = 'var(--accent)';
+
+                if (tiempoRestante <= 0) {
+                    clearInterval(timerInterval);
+                    perderVida("¡Se acabó el tiempo!");
+                    if(vidas > 0) cargarNivel(); 
+                }
+            }, 1000);
+        }
+
+        function perderVida(feedback) {
+            vidas--;
+            
+            const contVidas = document.getElementById('vidas-display');
+            contVidas.innerHTML = "Vidas: ";
+            for(let i=0; i<vidas; i++) { 
+                contVidas.innerHTML += `<span class="corazon">❤️</span>`; 
+            }
+            
+            if(vidas >= 0) {
+                contVidas.innerHTML += `<span class="corazon animar-daño">💔</span>`;
+            }
+
+            registrarLog(`❌ ${feedback}`, 'error');
+            
+            if(vidas <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('pantalla-derrota').style.display = 'flex';
+            }
+        }
+
+        function cargarNivel() {
+            if (nivelActual === 9) {
+                mostrarAvisoJefe();
+                return;
+            }
+            ejecutarCargaNivel();
+        }
+
+        function mostrarAvisoJefe() {
+            const titulo = document.getElementById('aviso-titulo');
+            const texto = document.getElementById('aviso-texto');
+
+            if (temaSeleccionado === 'musica') {
+                titulo.innerText = "¡HA APARECIDO EL REY DEL POP!";
+                texto.innerText = "¡Michael Jackson ha bloqueado tu camino! Tienes que enfrentarlo superando sus 3 fases críticas para completar el mundo.";
+            } else if (temaSeleccionado === 'videojuegos') {
+                titulo.innerText = "¡HA APARECIDO LA ESPADA DE MIQUELLA!";
+                texto.innerText = "¡Malenia, la temible guerrera de la Putrefacción Roja, se alza frente a ti! Derrota sus 3 fases para conquistar este mundo.";
+            } else {
+                titulo.innerText = "¡HA APARECIDO EL LORD SITH!";
+                texto.innerText = "¡Darth Vader ha tomado el control del sector! Debes enfrentarlo a lo largo de sus 3 fases para restaurar el sistema.";
+            }
+
+            document.getElementById('pantalla-aviso-jefe').style.display = 'flex';
+        }
+
+        function cerrarAvisoJefe() {
+            document.getElementById('pantalla-aviso-jefe').style.display = 'none';
+            ejecutarCargaNivel();
+        }
+
+        function ejecutarCargaNivel() {
+            actualizarUI();
+            iniciarTemporizador();
+            const enemigo = rutaActual[nivelActual];
+            const cartasContainer = document.getElementById('cartas-container');
+            cartasContainer.innerHTML = '';
+            
+            document.getElementById('enemigo-nombre').innerText = enemigo.nombre;
+            document.getElementById('enemigo-img').src = enemigo.img;
+            document.getElementById('enemigo-dialogo').innerText = enemigo.pregunta;
+            
+            enemigo.opciones.sort(() => Math.random() - 0.5).forEach(opcion => {
+                const carta = document.createElement('div');
+                carta.className = 'carta';
+                carta.innerHTML = `<h3>${opcion.txt}</h3>`;
+                carta.onclick = () => procesarAtaque(opcion.correcta, enemigo.feedbackError);
+                cartasContainer.appendChild(carta);
+            });
+        }
+
+        function procesarAtaque(esCorrecta, feedbackError) {
+            clearInterval(timerInterval); 
+            if (esCorrecta) {
+                if(nivelActual < 9) {
+                    registrarLog(`✅ ¡Correcto! Enemigo derrotado.`, 'ok');
+                } else {
+                    registrarLog(`⚡ ¡Impacto crítico! Fase ${nivelActual - 8} superada.`, 'ok');
+                }
+                
+                if (nivelActual >= 11) {
+                    document.getElementById('pantalla-victoria').style.display = 'flex';
+                } else {
+                    nivelActual++;
+                    cargarNivel();
+                }
+            } else {
+                perderVida("Respuesta incorrecta. " + feedbackError);
+                if(vidas > 0) cargarNivel(); 
+            }
+        }
+    </script>
+</body>
+</html>
